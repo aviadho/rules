@@ -3,8 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="מאגר הצעות החוק של חברות וחברי הכנסת מהעבודה וממרצ שלא עברו, לפי נושאים, עם תקצירים ונוסח Word להגשה מחדש.">
+<meta name="description" content="3,101 הצעות חוק של חברות וחברי הכנסת מהעבודה וממרצ שלא עברו, לפי נושאים, עם תקציר לכל הצעה ונוסח Word להגשה מחדש.">
+<link rel="canonical" href="https://aviadho.github.io/rules/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2324356d'/%3E%3Crect x='12' y='34' width='40' height='14' rx='3' fill='%237ed2f6' transform='rotate(-4 32 41)'/%3E%3Ccircle cx='46' cy='18' r='6' fill='%23e1323f'/%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="he_IL">
+<meta property="og:site_name" content="מאגר הצעות החוק – העבודה ומרצ">
+<meta property="og:title" content="הצעות חוק שמחכות לקדנציה הבאה">
+<meta property="og:description" content="3,101 הצעות חוק של חברות וחברי הכנסת מהעבודה וממרצ שלא עברו, לפי נושאים, עם תקציר לכל הצעה ונוסח Word להגשה מחדש.">
+<meta property="og:url" content="https://aviadho.github.io/rules/">
+<meta property="og:image" content="https://aviadho.github.io/rules/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="מאגר הצעות החוק של העבודה ומרצ – הצעות חוק שמחכות לקדנציה הבאה">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="הצעות חוק שמחכות לקדנציה הבאה">
+<meta name="twitter:description" content="3,101 הצעות חוק של חברות וחברי הכנסת מהעבודה וממרצ שלא עברו, לפי נושאים, עם תקציר לכל הצעה ונוסח Word להגשה מחדש.">
+<meta name="twitter:image" content="https://aviadho.github.io/rules/og-image.png">
 <style>body{margin:0} img{max-width:100%} [hidden]{display:none!important}</style>
 <title>מאגר הצעות החוק – העבודה ומרצ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -532,7 +547,15 @@ const mkCount = {};
 for (const i of items) for (const m of i.ours) mkCount[m] = (mkCount[m] || 0) + 1;
 Object.keys(mkCount).sort((a, b) => a.localeCompare(b, "he")).forEach(m => $("#fMk").add(new Option(`${m} (${mkCount[m]})`, m)));
 
+// Usage events for the site's analytics (GoatCounter); does nothing when analytics is not loaded
+function track(name) {
+  try { window.goatcounter && window.goatcounter.count && window.goatcounter.count({ path: name, title: name, event: true }); } catch {}
+}
+let trackQt;
+function trackSearch(q) { clearTimeout(trackQt); if (q.length >= 2) trackQt = setTimeout(() => track("חיפוש: " + q), 1500); }
+
 function openTopic(c) {
+  track("נושא: " + T[c]);
   state.topic = c; state.page = 0; state.mylist = false;
   render(); goResults();
 }
@@ -629,8 +652,8 @@ function card(i) {
     <div class="foot">
       <div class="road" title="${esc(i.best.status)}"><span class="steps">${[1, 2, 3, 4].map(n => `<i class="${n <= st ? "on" : ""}"></i>`).join("")}</span><span>הגיעה עד: <b>${esc(STAGES[st])}</b>${i.v.length > 1 && i.best !== b ? ` (בכנסת ה-${i.best.k})` : ""}</span></div>
       <div class="acts">
-        ${word ? `<a class="btn primary" href="${esc(word)}" target="_blank" rel="noopener">הורדת נוסח Word</a>` : b.doc ? `<a class="btn primary" href="${esc(b.doc)}" target="_blank" rel="noopener">לנוסח ההצעה</a>` : ""}
-        <a class="btn" href="${site}" target="_blank" rel="noopener">באתר הכנסת</a>
+        ${word ? `<a class="btn primary" data-ev="הורדת Word" href="${esc(word)}" target="_blank" rel="noopener">הורדת נוסח Word</a>` : b.doc ? `<a class="btn primary" href="${esc(b.doc)}" target="_blank" rel="noopener">לנוסח ההצעה</a>` : ""}
+        <a class="btn" data-ev="מעבר לאתר הכנסת" href="${site}" target="_blank" rel="noopener">באתר הכנסת</a>
         <button class="btn copy" type="button">העתקת השם</button>
       </div>
     </div>`;
@@ -644,9 +667,11 @@ function card(i) {
     try { localStorage.setItem("lawdb-list", JSON.stringify([...saved])); } catch {}
     $("#mylistN").textContent = saved.size;
     toast(saved.has(i.key) ? "נשמרה ברשימה שלי" : "הוסרה מהרשימה");
+    if (saved.has(i.key)) track("שמירה ברשימה");
   };
+  el.querySelectorAll("[data-ev]").forEach(a => a.addEventListener("click", () => track(`${a.dataset.ev}: פ/${b.num} (${b.k})`)));
   if (saved.has(i.key)) el.querySelector(".star path").setAttribute("fill-opacity", "1");
-  el.querySelector(".copy").onclick = () => copy(`${i.title} (פ/${b.num}, הכנסת ה-${b.k})`, "השם הועתק");
+  el.querySelector(".copy").onclick = () => { copy(`${i.title} (פ/${b.num}, הכנסת ה-${b.k})`, "השם הועתק"); track("העתקת שם"); };
   return el;
 }
 
@@ -658,13 +683,13 @@ let tt;
 function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 2000); }
 
 let qt;
-$("#q").addEventListener("input", e => { clearTimeout(qt); qt = setTimeout(() => { state.q = e.target.value.trim(); state.page = 0; render(); }, 180); });
+$("#q").addEventListener("input", e => { clearTimeout(qt); qt = setTimeout(() => { state.q = e.target.value.trim(); state.page = 0; render(); trackSearch(state.q); }, 180); });
 $("#q").addEventListener("keydown", e => { if (e.key === "Enter") { state.q = e.target.value.trim(); state.page = 0; render(); goResults(); } });
 $("#home").onclick = () => { Object.assign(state, { topic: "", q: "", stage: "", k: "", mk: "", party: "", mylist: false, page: 0 }); $("#q").value = ""; for (const id of ["fStage", "fK", "fMk", "fParty"]) $("#" + id).value = ""; render(); document.getElementById("shelves").scrollIntoView({ block: "start" }); };
 $("#sort").onchange = e => { state.sort = e.target.value; state.page = 0; render(); };
 $("#advBtn").onclick = e => { const a = $("#adv"); a.hidden = !a.hidden; e.currentTarget.setAttribute("aria-expanded", String(!a.hidden)); e.currentTarget.classList.toggle("on", !a.hidden); };
 $("#mylistBtn").onclick = () => { state.mylist = !state.mylist; state.page = 0; render(); goResults(); };
-for (const [id, k] of [["fStage", "stage"], ["fK", "k"], ["fMk", "mk"], ["fParty", "party"]]) $("#" + id).onchange = e => { state[k] = e.target.value; state.page = 0; render(); };
+for (const [id, k] of [["fStage", "stage"], ["fK", "k"], ["fMk", "mk"], ["fParty", "party"]]) $("#" + id).onchange = e => { state[k] = e.target.value; state.page = 0; render(); if (e.target.value) track("סינון: " + e.target.selectedOptions[0].text.replace(/\s*\(\d+\)$/, "")); };
 for (const [id, k] of [["fLead", "lead"], ["fActive", "active"], ["fSimilar", "similar"]]) $("#" + id).onchange = e => { state[k] = e.target.checked; state.page = 0; render(); };
 
 // A shared link like #t87 opens that topic
