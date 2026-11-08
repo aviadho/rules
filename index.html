@@ -250,7 +250,7 @@ footer p { max-width: 85ch; margin: 8px 0 0 }
 <footer class="wrap">
   <details>
     <summary>על המאגר: מקורות ומגבלות</summary>
-    <p>הנתונים נלקחו ממאגר המידע הפתוח של הכנסת ועודכנו לאחרונה ב-25.10.2026. נכללו הצעות חוק פרטיות שהובלו או נחתמו בידי חברות וחברי כנסת מהעבודה וממרצ, כולל בתקופת המחנה הציוני, המחנה הדמוקרטי והרשימות המשותפות. מי שכיהנו מטעם התנועה וגשר באותן רשימות לא נכללו.</p>
+    <p>הנתונים נלקחו ממאגר המידע הפתוח של הכנסת ועודכנו לאחרונה ב-08.11.2026. נכללו הצעות חוק פרטיות שהובלו או נחתמו בידי חברות וחברי כנסת מהעבודה וממרצ, כולל בתקופת המחנה הציוני, המחנה הדמוקרטי והרשימות המשותפות. מי שכיהנו מטעם התנועה וגשר באותן רשימות לא נכללו.</p>
     <p>הוסרו הצעות שהתקבלו בקריאה שלישית, וגם הצעות שמוזגו להצעה שהתקבלה. הסיווג לנושאים והתקציר מדברי ההסבר נעשו אוטומטית, ולכן כדאי לקרוא את הנוסח המלא לפני הגשה מחדש.</p>
     <p>"עד איפה הגיעה" נקבע לפי הסטטוס במאגר הכנסת ולפי המסמכים שפורסמו לכל שלב. הסימון "חוק בשם זהה עבר" מבוסס על התאמת כותרות בלבד.</p>
   </details>
@@ -425,7 +425,7 @@ function prepareItem(i) {
   i._lead = indexText(i.v.map(b => b.lead).join(" "));
   i._names = indexText(i.names.join(" "));
   i._titleNorm = " " + normalizeHe(i.title) + " ";
-  i._nums = new Set(i.v.map(b => String(b.num)));
+  i._nums = new Set(i.v.flatMap(b => [String(b.num), `${b.num}/${b.k}`]));
 }
 
 // Group repeat tablings of the same proposal into one item
@@ -464,8 +464,13 @@ function search(items, query) {
   const raw = normalizeHe(query);
   if (!raw) return null;
   const qTokens = raw.split(" ").filter(Boolean);
+  // a bill number: "פ/1234", "1234" or "פ/1234/25" (number and Knesset)
   const num = qTokens.find(t => /^\d{3,5}$/.test(t));
-  if (num && qTokens.length <= 2) return items.filter(i => i._nums.has(num)).map(i => ({ item: i, score: 100 }));
+  if (num && qTokens.length <= 3) {
+    const k = qTokens.find(t => /^2[0-5]$/.test(t));
+    const key = k ? `${num}/${k}` : num;
+    return items.filter(i => i._nums.has(key)).map(i => ({ item: i, score: 100 }));
+  }
 
   // Units of meaning: a topic phrase, a synonym group, or a single word.
   // The longest phrase wins ("דיור ציבורי" is a specific term, not the topic "דיור" plus a word);
@@ -585,13 +590,15 @@ function filtered() {
 let current = [];
 function render() {
   current = filtered();
-  const title = state.mylist ? "הרשימה שלי" : state.topic ? T[state.topic] : state.q ? `תוצאות עבור "${state.q}"` : "כל ההצעות";
+  // the query is isolated so "פ/6565/25" keeps its order inside Hebrew text
+  const qShown = `"⁨${state.q}⁩"`;
+  const title = state.mylist ? "הרשימה שלי" : state.topic ? T[state.topic] : state.q ? `תוצאות עבור ${qShown}` : "כל ההצעות";
   $("#resTitle").textContent = title;
   $("#resN").textContent = `${fmt(current.length)} הצעות`;
   // active filter chips
   const chips = [];
   if (state.topic) chips.push([T[state.topic], () => state.topic = ""]);
-  if (state.q) chips.push([`"${state.q}"`, () => { state.q = ""; $("#q").value = ""; }]);
+  if (state.q) chips.push([qShown, () => { state.q = ""; $("#q").value = ""; }]);
   if (state.mylist) chips.push(["הרשימה שלי", () => state.mylist = false]);
   if (state.stage) chips.push([SHORT_STAGE[state.stage] + " ומעלה", () => { state.stage = ""; $("#fStage").value = ""; }]);
   if (state.k) chips.push([`כנסת ${state.k}`, () => { state.k = ""; $("#fK").value = ""; }]);
@@ -641,7 +648,7 @@ function card(i) {
   el.innerHTML = `
     <div class="top">
       <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
-        <div class="kicker"><span>${esc(knesset)}</span><span>פ/${b.num}</span>${i.active ? `<span class="live">● פעילה כעת</span>` : ""}${i.similar ? `<span>חוק בשם זהה עבר</span>` : ""}</div>
+        <div class="kicker"><span>${esc(knesset)}</span><span class="pnum">${i.v.map(x => `<bdi>פ/${x.num}/${x.k}</bdi>`).join(" · ")}</span>${i.active ? `<span class="live">● פעילה כעת</span>` : ""}${i.similar ? `<span>חוק בשם זהה עבר</span>` : ""}</div>
         <h3>${esc(i.title)}</h3>
       </div>
       <button class="star" type="button" aria-pressed="${saved.has(i.key)}" aria-label="שמירה ברשימה שלי">${STAR}</button>
@@ -649,7 +656,7 @@ function card(i) {
     ${sum}
     <div class="who">בהובלת ${lead}${co.length ? ` · יחד עם ${co.map(m => `<b>${esc(m)}</b>`).join(", ")}` : ""}${b.allInit.length > 1 + co.length ? ` ועוד ${b.allInit.length - 1 - co.length}` : ""}</div>
     <div class="tags"></div>
-    ${i.v.length > 1 ? `<details class="versions"><summary>כל ההגשות (${i.v.length})</summary><ul>${i.v.map(x => `<li>הכנסת ה-${x.k} · פ/${x.num} · ${esc(x.lead)} · ${esc(SHORT_STAGE[x.stage])}${x.word ? ` · <a href="${esc(x.word)}" target="_blank" rel="noopener">Word</a>` : ""}${x.doc && x.doc !== x.word ? ` · <a href="${esc(x.doc)}" target="_blank" rel="noopener">נוסח</a>` : ""}</li>`).join("")}</ul></details>` : ""}
+    ${i.v.length > 1 ? `<details class="versions"><summary>כל ההגשות (${i.v.length})</summary><ul>${i.v.map(x => `<li>פ/${x.num}/${x.k} · ${esc(x.lead)} · ${esc(SHORT_STAGE[x.stage])}${x.word ? ` · <a href="${esc(x.word)}" target="_blank" rel="noopener">Word</a>` : ""}${x.doc && x.doc !== x.word ? ` · <a href="${esc(x.doc)}" target="_blank" rel="noopener">נוסח</a>` : ""}</li>`).join("")}</ul></details>` : ""}
     <div class="foot">
       <div class="road" title="${esc(i.best.status)}"><span class="steps">${[1, 2, 3, 4].map(n => `<i class="${n <= st ? "on" : ""}"></i>`).join("")}</span><span>הגיעה עד: <b>${esc(STAGES[st])}</b>${i.v.length > 1 && i.best !== b ? ` (בכנסת ה-${i.best.k})` : ""}</span></div>
       <div class="acts">
@@ -670,9 +677,9 @@ function card(i) {
     toast(saved.has(i.key) ? "נשמרה ברשימה שלי" : "הוסרה מהרשימה");
     if (saved.has(i.key)) track("שמירה ברשימה");
   };
-  el.querySelectorAll("[data-ev]").forEach(a => a.addEventListener("click", () => track(`${a.dataset.ev}: פ/${b.num} (${b.k})`)));
+  el.querySelectorAll("[data-ev]").forEach(a => a.addEventListener("click", () => track(`${a.dataset.ev}: פ/${b.num}/${b.k}`)));
   if (saved.has(i.key)) el.querySelector(".star path").setAttribute("fill-opacity", "1");
-  el.querySelector(".copy").onclick = () => { copy(`${i.title} (פ/${b.num}, הכנסת ה-${b.k})`, "השם הועתק"); track("העתקת שם"); };
+  el.querySelector(".copy").onclick = () => { copy(`${i.title} (פ/${b.num}/${b.k})`, "השם הועתק"); track("העתקת שם"); };
   return el;
 }
 
